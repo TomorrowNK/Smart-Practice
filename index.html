@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Practice</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--pause-color:#f39c12;--play-color:#27ae60}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#eee;display:flex;min-height:100vh;overflow:hidden}
+.sidebar{width:64px;background:#16213e;display:flex;flex-direction:column;align-items:center;padding:15px 0;gap:8px;position:relative}
+.sidebar .vol-icon{font-size:18px;color:#888}
+.volume-fader{position:relative;width:25px;height:60vh;flex:none;margin:5px 0;background:#333;border-radius:4px;outline:none;overflow:hidden;cursor:ns-resize;user-select:none;touch-action:none;box-shadow:inset 0 0 0 1px #0f3460}
+.volume-fader:focus-visible,.volume-fader.dragging{box-shadow:inset 0 0 0 2px #e94560,0 0 0 2px #0f3460}
+.volume-fill{position:absolute;right:0;bottom:0;left:0;height:100%;background:linear-gradient(0deg,#e94560,#ff7b5c);transform:scaleY(0);transform-origin:bottom;transition:transform .06s linear;will-change:transform}
+.main{flex:1;display:flex;flex-direction:column;align-items:center;padding:25px;gap:18px}
+.settings-btn{position:fixed;top:15px;right:15px;width:38px;height:38px;background:#16213e;border:2px solid #0f3460;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;z-index:50}
+.settings-btn:hover{background:#0f3460}
+.settings-btn svg{width:20px;height:20px;fill:#eee}
+.settings-panel{display:none;position:fixed;top:60px;right:15px;background:#16213e;border-radius:12px;padding:20px;width:340px;z-index:100;box-shadow:0 10px 40px rgba(0,0,0,.5);border:1px solid #0f3460}
+.settings-panel.show{display:block}
+.settings-panel h3{margin-bottom:15px;color:#e94560;font-size:16px}
+.sound-option{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.sound-option label{flex:1;font-size:13px;color:#aaa}
+.sound-option input[type=file]{font-size:12px;color:#888}
+.sound-option button{padding:4px 12px;background:#0f3460;border:none;color:#eee;border-radius:4px;cursor:pointer;font-size:12px}
+.sound-option button:hover{background:#e94560}
+.sound-option .sound-name{flex:0 0 100%;font-size:12px;line-height:1.4;color:#6f7a94;word-break:break-word}
+.sound-option .sound-name.saved{color:#5fd39b}
+.sound-status{display:none;margin-top:4px;font-size:12px;line-height:1.4;color:#ffb454}
+.sound-status.show{display:block}
+.controls{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+.controls-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;width:100%}
+.setting-group{background:#16213e;border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:10px;border:1px solid #0f3460}
+.setting-group label{font-size:12px;color:#888;white-space:nowrap}
+.fraction{display:flex;align-items:center;gap:3px}
+.fraction-cell,.number-cell{height:48px;background:#0f3460;border:2px solid #1a1a4e;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;cursor:pointer;user-select:none;touch-action:none;transition:background .15s,border-color .15s}
+.fraction-cell{width:48px;font-size:24px}
+.number-cell{min-width:48px;padding:0 9px;font-size:20px}
+.fraction-cell:hover,.number-cell:hover{background:#1a1a4e}
+.fraction-cell:focus-visible,.number-cell:focus-visible{outline:none;box-shadow:0 0 0 2px #e94560}
+.fraction-cell.dragging,.number-cell.dragging{background:#e94560;border-color:#e94560}
+.fraction-bar{width:1px;height:28px;background:#555}
+.beats-cell{width:48px;height:48px;background:#0f3460;border:2px solid #1a1a4e;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:bold;cursor:pointer;user-select:none;transition:background .15s,border-color .15s}
+.beats-cell:hover{background:#1a1a4e}
+.beats-cell.dragging{background:#e94560;border-color:#e94560}
+.checkbox-label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;white-space:nowrap}
+.checkbox-label input{width:16px;height:16px;accent-color:#e94560}
+.btn-group{display:flex;gap:18px;margin:5px 0}
+.btn{width:58px;height:58px;border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .1s,box-shadow .2s;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+.btn:hover{transform:scale(1.08);box-shadow:0 5px 15px rgba(0,0,0,.4)}
+.btn:active{transform:scale(0.95)}
+  .btn-play{background:var(--play-color)}.btn-pause{background:var(--pause-color)}.btn-stop{background:#e74c3c}
+  .btn svg{width:26px;height:26px;fill:#fff}
+  .progress-container{width:100%;max-width:520px;background:#333;border-radius:12px;height:28px;position:relative;overflow:hidden;border:1px solid #0f3460}
+  .progress-fill{height:100%;background:#27ae60;border-radius:11px;transition:width .4s ease}
+  .progress-label{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:13px;font-weight:bold;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+  .beat-indicator{width:100%;max-width:520px;margin-top:4px;text-align:center;color:#fff;font-size:clamp(64px,14vw,144px);line-height:.95;font-weight:800;font-variant-numeric:tabular-nums;text-shadow:0 4px 14px rgba(0,0,0,.65)}
+  .beat-indicator.beat-one{color:var(--pause-color)}
+  .beat-indicator.lead-in{color:var(--play-color)}
+.context-menu{display:none;position:fixed;background:#16213e;border-radius:8px;padding:5px 0;box-shadow:0 5px 20px rgba(0,0,0,.5);z-index:200;min-width:100px;max-width:calc(100vw - 20px);max-height:min(380px,calc(100vh - 20px));overflow-y:auto;overscroll-behavior:contain;border:1px solid #0f3460}
+.context-menu.show{display:block}
+.context-menu .cm-title{padding:5px 16px;color:#e94560;font-weight:bold;font-size:13px;border-bottom:1px solid #333}
+.context-menu div{padding:7px 16px;cursor:pointer;font-size:14px}
+.context-menu div:hover{background:#0f3460}
+.context-menu div.active{background:#1a3a6e}
+</style>
+   <link rel="icon" href="data:image/png;base64,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" type="image/png" sizes="32x32">
+</head>
+<body>
+
+<div class="sidebar">
+  <span class="vol-icon">🔊</span>
+  <div class="volume-fader" id="volumeFader" role="slider" tabindex="0" aria-label="Громкость" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75" aria-valuetext="75%">
+    <div class="volume-fill" style="transform:scaleY(.75)"></div>
+  </div>
+</div>
+
+<div class="main">
+  <button class="settings-btn" id="settingsBtn" title="Настройки звука">
+    <svg viewBox="0 0 24 24"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+  </button>
+
+  <div class="settings-panel" id="settingsPanel">
+    <h3>⚙ Настройки звука</h3>
+    <div class="sound-option">
+      <label>Звук первой доли:</label>
+      <input type="file" id="soundFirstFile" accept="audio/*">
+      <button id="resetFirst">Сброс</button>
+      <span class="sound-name" id="soundFirstName">Стандартный звук</span>
+    </div>
+    <div class="sound-option">
+      <label>Звук обычной доли:</label>
+      <input type="file" id="soundNormalFile" accept="audio/*">
+      <button id="resetNormal">Сброс</button>
+      <span class="sound-name" id="soundNormalName">Стандартный звук</span>
+    </div>
+    <div class="sound-status" id="soundStatus" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="controls">
+    <div class="controls-row">
+      <div class="setting-group">
+        <label>Размер:</label>
+        <div class="fraction">
+          <div class="fraction-cell" id="numCell" role="slider" tabindex="0" aria-label="Числитель" aria-orientation="vertical" aria-valuemin="1" aria-valuemax="24" aria-valuenow="4" aria-valuetext="4" aria-haspopup="menu">4</div>
+          <div class="fraction-bar"></div>
+          <div class="fraction-cell" id="denCell" role="slider" tabindex="0" aria-label="Знаменатель" aria-orientation="vertical" aria-valuemin="1" aria-valuemax="16" aria-valuenow="4" aria-valuetext="4" aria-haspopup="menu">4</div>
+        </div>
+      </div>
+      <div class="setting-group">
+        <label>Тактов:</label>
+        <div class="beats-cell" id="beatsCell">4</div>
+      </div>
+      <div class="setting-group">
+        <label>Целевой BPM:</label>
+        <div class="number-cell" id="bpmCell" role="slider" tabindex="0" aria-label="Целевой BPM" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="300" aria-valuenow="120" aria-valuetext="120" aria-haspopup="menu">120</div>
+      </div>
+      <div class="setting-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="showBeatCheck"> Показывать долю
+        </label>
+      </div>
+    </div>
+    <div class="controls-row">
+      <div class="setting-group">
+        <label>Стартовый BPM:</label>
+        <div class="number-cell" id="startCell" role="slider" tabindex="0" aria-label="Стартовый BPM" aria-orientation="vertical" aria-valuemin="1" aria-valuemax="99" aria-valuenow="70" aria-valuetext="70%" aria-haspopup="menu">70%</div>
+      </div>
+      <div class="setting-group">
+        <label>Шаг:</label>
+        <div class="number-cell" id="stepCell" role="slider" tabindex="0" aria-label="Шаг" aria-orientation="vertical" aria-valuemin="1" aria-valuemax="20" aria-valuenow="5" aria-valuetext="5%" aria-haspopup="menu">5%</div>
+      </div>
+      <div class="setting-group">
+        <label>Повторы:</label>
+        <div class="number-cell" id="repsCell" role="slider" tabindex="0" aria-label="Повторы" aria-orientation="vertical" aria-valuemin="1" aria-valuemax="20" aria-valuenow="3" aria-valuetext="3" aria-haspopup="menu">3</div>
+      </div>
+      <div class="setting-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="leadInCheck"> Отсчёт
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-play" id="btnPlay" title="Play">
+      <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="btn btn-pause" id="btnPause" title="Pause">
+      <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+    <button class="btn btn-stop" id="btnStop" title="Stop">
+      <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+    </button>
+  </div>
+
+  <div class="progress-container">
+    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    <div class="progress-label" id="progressLabel">70.0 BPM</div>
+  </div>
+  <div class="beat-indicator" id="beatIndicator" hidden>1</div>
+</div>
+
+<div class="context-menu" id="contextMenu" role="menu"></div>
+
+<script>
+const S={numerator:4,denominator:4,beatsCount:4,targetBPM:120,startPct:70,stepPct:5,reps:3,leadIn:false,showBeat:false,beatNumber:1,beatDisplayLeadIn:false,isPlaying:false,isPaused:false,currentBPM:0,progress:0,pendingBPM:null,pendingProgress:0,beatIndex:0,measureIndex:0,repCounter:0,timer:null,leadInActive:false,volume:0.75,soundFirstSrc:null,soundFirstName:null,soundNormalSrc:null,soundNormalName:null};
+const LEAD_IN_PITCH_RATIO=Math.pow(2, -4/12);
+let audioCtx=null,gainNode=null;const activeSounds=new Set();
+
+function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(!gainNode){gainNode=audioCtx.createGain();gainNode.connect(audioCtx.destination)}gainNode.gain.value=S.volume;if(audioCtx.state==='suspended'){try{const resume=audioCtx.resume();if(resume&&typeof resume.catch==='function')resume.catch(()=>{})}catch(e){}}}
+
+function getStartBPM(){return Math.round(S.targetBPM*S.startPct/100*10)/10}
+function getBeatInterval(bpm){return 60000/bpm*(4/S.denominator)}
+function getMeasuresPerLevel(){return S.beatsCount*S.reps}
+
+function playSynth(freq,dur,isDownbeat,pitchRatio=1){const osc=audioCtx.createOscillator();const og=audioCtx.createGain();osc.connect(og);og.connect(gainNode);osc.type=isDownbeat?'triangle':'sine';osc.frequency.value=(isDownbeat?freq*1.5:freq)*pitchRatio;const v=isDownbeat?0.5:0.35;og.gain.setValueAtTime(v,audioCtx.currentTime);og.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);osc.start();osc.stop(audioCtx.currentTime+dur)}
+
+function setVolume(value){S.volume=Math.max(0,Math.min(1,value));if(gainNode)gainNode.gain.setTargetAtTime(S.volume,audioCtx.currentTime,.015)}
+function stopActiveSource(source){activeSounds.delete(source);try{source.onended=null;source.stop()}catch(e){}try{source.disconnect()}catch(e){}}
+function stopActiveSounds(){activeSounds.forEach(source=>stopActiveSource(source))}
+function playSound(slot,pitchRatio=1){const cfg=SOUND_SLOTS[slot],buffer=cfg&&soundBuffers[slot];if(!cfg||!buffer||soundBufferTokens[slot]!==soundTokens[slot]||!S[cfg.srcKey]||!audioCtx||!gainNode)return false;let source=null;try{activeSounds.forEach(other=>{if(other.soundSlot===slot)stopActiveSource(other)});source=audioCtx.createBufferSource();source.buffer=buffer;source.playbackRate.value=pitchRatio;source.soundSlot=slot;source.connect(gainNode);activeSounds.add(source);source.onended=()=>{activeSounds.delete(source);try{source.disconnect()}catch(e){}};source.start();return true}catch(e){if(source){activeSounds.delete(source);try{source.disconnect()}catch(e){}}return false}}
+function playTick(isDownbeat,pitchRatio=1){initAudio();if(isDownbeat){if(playSound('first',pitchRatio))return;playSynth(440,0.2,true,pitchRatio)}else{if(playSound('normal',pitchRatio))return;playSynth(440,0.1,false,pitchRatio)}}
+
+const CELL_DEFS={num:{id:'numCell',key:'numerator',title:'Числитель',min:1,max:24},den:{id:'denCell',key:'denominator',title:'Знаменатель',min:1,max:16,allowed:[1,2,4,8,16]},bpm:{id:'bpmCell',key:'targetBPM',title:'Целевой BPM',min:40,max:300,activeOnly:true},start:{id:'startCell',key:'startPct',title:'Стартовый BPM',min:1,max:99,percent:true,activeOnly:true},step:{id:'stepCell',key:'stepPct',title:'Шаг',min:1,max:20,percent:true,activeOnly:true},reps:{id:'repsCell',key:'reps',title:'Повторы',min:1,max:20,activeOnly:true}},CELL_DRAG_THRESHOLD=12;
+function cellText(def,value){return def.percent?value+'%':String(value)}
+function cellValues(def){return def.allowed||Array.from({length:def.max-def.min+1},(_,i)=>def.min+i)}
+function clampCellValue(def,value){const min=def.allowed?def.allowed[0]:def.min,max=def.allowed?def.allowed[def.allowed.length-1]:def.max;return Math.max(min,Math.min(max,value))}
+function nextCellValue(def,value,amount){if(def.allowed){const index=def.allowed.indexOf(value);return def.allowed[Math.max(0,Math.min(def.allowed.length-1,index+amount))]}return clampCellValue(def,value+amount)}
+function renderCell(el,def){const value=S[def.key],text=cellText(def,value),min=def.allowed?def.allowed[0]:def.min,max=def.allowed?def.allowed[def.allowed.length-1]:def.max;el.textContent=text;el.setAttribute('aria-valuemin',min);el.setAttribute('aria-valuemax',max);el.setAttribute('aria-valuenow',value);el.setAttribute('aria-valuetext',text)}
+function saveCellChange(def){if(S.isPlaying&&(!def.activeOnly||!S.isPaused))stopMetronome();if(def.key==='numerator'&&!S.isPlaying)S.beatNumber=1;updateBeatIndicator();saveSettings()}
+
+function positionCM(x,y){const menu=document.getElementById('contextMenu'),gap=10;menu.classList.add('show');menu.style.left='0px';menu.style.top='0px';const active=menu.querySelector('.active');if(active)menu.scrollTop=Math.max(0,active.offsetTop-menu.clientHeight/2);const vw=document.documentElement.clientWidth||window.innerWidth,vh=document.documentElement.clientHeight||window.innerHeight,mw=menu.offsetWidth,mh=menu.offsetHeight;let left=x+mw>vw-gap?x-mw-gap:x,top=y+mh>vh-gap?y-mh-gap:y;menu.style.left=Math.max(gap,Math.min(left,vw-mw-gap))+'px';menu.style.top=Math.max(gap,Math.min(top,vh-mh-gap))+'px'}
+
+function setupCell(el,def){renderCell(el,def);let dragging=false,startY=0,curVal=S[def.key],rafId=null,didDrag=false;
+function onDragMove(ev){if(!dragging)return;if(rafId)cancelAnimationFrame(rafId);rafId=requestAnimationFrame(()=>{rafId=null;if(!dragging)return;const diff=startY-ev.clientY,delta=Math.floor(Math.abs(diff)/CELL_DRAG_THRESHOLD);if(delta===0)return;const nv=nextCellValue(def,curVal,(diff>0?1:-1)*delta);if(nv!==curVal){S[def.key]=nv;curVal=nv;renderCell(el,def);didDrag=true;saveCellChange(def)}startY=ev.clientY})}
+function onDragUp(){dragging=false;el.classList.remove('dragging');document.removeEventListener('mousemove',onDragMove);document.removeEventListener('mouseup',onDragUp)}
+el.addEventListener('mousedown',e=>{if(e.button!==0)return;e.preventDefault();el.focus({preventScroll:true});dragging=true;didDrag=false;startY=e.clientY;curVal=S[def.key];el.classList.add('dragging');document.addEventListener('mousemove',onDragMove);document.addEventListener('mouseup',onDragUp)});
+el.addEventListener('click',e=>{if(didDrag){didDrag=false;return}e.stopPropagation()});
+el.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();showCM(e.clientX,e.clientY,def)});
+el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showCM(e.clientX,e.clientY,def)});
+el.addEventListener('keydown',e=>{let amount=0;if(e.key==='ArrowUp'||e.key==='ArrowRight')amount=1;else if(e.key==='ArrowDown'||e.key==='ArrowLeft')amount=-1;else if(e.key==='PageUp')amount=5;else if(e.key==='PageDown')amount=-5;else if(e.key==='Home')amount=Number.MAX_SAFE_INTEGER;else if(e.key==='End')amount=-Number.MAX_SAFE_INTEGER;else return;e.preventDefault();const current=S[def.key];let nv=nextCellValue(def,current,amount);if(e.key==='Home')nv=clampCellValue(def,def.allowed?def.allowed[0]:def.min);if(e.key==='End')nv=clampCellValue(def,def.allowed?def.allowed[def.allowed.length-1]:def.max);if(nv===current)return;S[def.key]=nv;curVal=nv;renderCell(el,def);saveCellChange(def)})}
+
+function showCM(x,y,def){const menu=document.getElementById('contextMenu');menu.innerHTML='';menu.setAttribute('aria-label',def.title);const title=document.createElement('div');title.className='cm-title';title.textContent=def.title;menu.appendChild(title);const curVal=S[def.key];cellValues(def).forEach(v=>{const item=document.createElement('div'),active=v===curVal;item.textContent=cellText(def,v);item.setAttribute('role','menuitemradio');item.setAttribute('aria-checked',String(active));if(active)item.className='active';item.addEventListener('click',e=>{e.stopPropagation();if(v!==S[def.key]||!def.activeOnly){S[def.key]=v;renderCell(document.getElementById(def.id),def);saveCellChange(def)}menu.classList.remove('show')});menu.appendChild(item)});positionCM(x,y)}
+
+document.addEventListener('click',e=>{if(!document.getElementById('contextMenu').contains(e.target))document.getElementById('contextMenu').classList.remove('show')});
+
+function setupBeats(){const el=document.getElementById('beatsCell');let dragging=false,startY=0,curVal=S.beatsCount,rafId=null,didDrag=false;
+function onMove(ev){if(!dragging)return;if(rafId)cancelAnimationFrame(rafId);rafId=requestAnimationFrame(()=>{const diff=startY-ev.clientY;const delta=Math.floor(Math.abs(diff)/12);if(delta>0){const dir=diff>0?1:-1;let nv=curVal+dir*delta;nv=Math.max(1,Math.min(24,nv));S.beatsCount=nv;el.textContent=nv;curVal=nv;startY=ev.clientY;didDrag=true;saveSettings()} })};
+function onUp(){dragging=false;didDrag=false;el.classList.remove('dragging');document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp)};
+el.addEventListener('mousedown',e=>{if(e.button!==0)return;e.preventDefault();dragging=true;startY=e.clientY;curVal=S.beatsCount;el.classList.add('dragging');document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp)});
+el.addEventListener('click',e=>{if(didDrag){didDrag=false;return}e.stopPropagation()});
+el.addEventListener('dblclick',e=>{e.preventDefault();showBeatsCM(e.clientX,e.clientY)});
+el.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showBeatsCM(e.clientX,e.clientY)})}
+
+function showBeatsCM(x,y){const menu=document.getElementById('contextMenu');menu.innerHTML='';menu.setAttribute('aria-label','Тактов до ускорения');const title=document.createElement('div');title.className='cm-title';title.textContent='Тактов до ускорения';menu.appendChild(title);for(let v=1;v<=24;v++){const item=document.createElement('div');item.textContent=v;if(v===S.beatsCount)item.className='active';item.addEventListener('click',e=>{e.stopPropagation();S.beatsCount=v;document.getElementById('beatsCell').textContent=v;if(S.isPlaying)stopMetronome();saveSettings();menu.classList.remove('show')});menu.appendChild(item)}positionCM(x,y)}
+
+document.getElementById('settingsBtn').addEventListener('click',()=>document.getElementById('settingsPanel').classList.toggle('show'));
+const SOUND_SLOTS={first:{inputId:'soundFirstFile',nameId:'soundFirstName',srcKey:'soundFirstSrc',nameKey:'soundFirstName',dbKey:'first'},normal:{inputId:'soundNormalFile',nameId:'soundNormalName',srcKey:'soundNormalSrc',nameKey:'soundNormalName',dbKey:'normal'}};
+const SOUND_DB_NAME='metronomeSounds',SOUND_DB_STORE='soundFiles',SOUND_FALLBACK_PREFIX='metronomeSoundFallback:';
+const SOUND_FALLBACK_MAX_BYTES=1024*1024,SOUND_FALLBACK_MAX_LENGTH=Math.ceil(SOUND_FALLBACK_MAX_BYTES*4/3)+1024;
+const SOUND_SAVE_ERROR='Файл не удалось сохранить в браузере — он будет работать только до перезагрузки страницы';
+const SOUND_DELETE_ERROR='Не удалось удалить сохранённый файл из браузера';
+const SOUND_LOAD_ERROR='Не удалось восстановить сохранённые файлы — используются стандартные звуки';
+const soundTokens={first:0,normal:0},soundWrites={first:Promise.resolve(),normal:Promise.resolve()},soundIssues={first:'',normal:''};
+const soundBuffers={first:null,normal:null},soundBufferTokens={first:-1,normal:-1};
+let soundDB=null,soundDBUnavailable=false;
+
+function renderSoundName(slot){const cfg=SOUND_SLOTS[slot],el=document.getElementById(cfg.nameId);if(!el)return;const name=S[cfg.nameKey];el.textContent=name?'Файл: '+name:'Стандартный звук';el.classList.toggle('saved',!!name);el.title=name?'Сохранённый файл: '+name:'Стандартный звук'}
+function renderSoundStatus(){const el=document.getElementById('soundStatus');if(!el)return;const msg=soundIssues.first||soundIssues.normal;el.textContent=msg;el.classList.toggle('show',!!msg)}
+function setSoundIssue(slot,msg){soundIssues[slot]=msg||'';renderSoundStatus()}
+
+function decodeSoundData(data){return new Promise((resolve,reject)=>{let settled=false;const success=buffer=>{if(settled)return;settled=true;resolve(buffer)};const failure=error=>{if(settled)return;settled=true;reject(error||new Error('Sound decode failed'))};try{const result=audioCtx.decodeAudioData(data,success,failure);if(result&&typeof result.then==='function')result.then(success,failure)}catch(e){failure(e)}})}
+function preloadSoundBuffer(slot,src,token){if(token!==soundTokens[slot]||!src)return;soundBuffers[slot]=null;soundBufferTokens[slot]=-1;try{initAudio()}catch(e){return}if(!audioCtx||!gainNode||typeof fetch!=='function')return;Promise.resolve().then(()=>fetch(src)).then(response=>{if(!response||response.ok===false)throw new Error('Sound fetch failed');return response.arrayBuffer()}).then(data=>{if(token!==soundTokens[slot]||!audioCtx)return null;return decodeSoundData(data).then(buffer=>({buffer,src}))}).then(result=>{if(!result||token!==soundTokens[slot])return;const cfg=SOUND_SLOTS[slot];if(S[cfg.srcKey]!==src)return;soundBuffers[slot]=result.buffer;soundBufferTokens[slot]=token}).catch(()=>{if(token===soundTokens[slot]){soundBuffers[slot]=null;soundBufferTokens[slot]=-1}})}
+
+function openSoundDB(){return new Promise((resolve,reject)=>{
+ if(soundDB)return resolve(soundDB);
+ if(soundDBUnavailable)return reject(new Error('IndexedDB unavailable'));
+ let idb=null;try{idb=window.indexedDB||window.mozIndexedDB||window.webkitIndexedDB}catch(e){}
+ if(!idb){soundDBUnavailable=true;return reject(new Error('IndexedDB unsupported'))}
+ let req=null;try{req=idb.open(SOUND_DB_NAME,1)}catch(e){soundDBUnavailable=true;return reject(e)}
+ req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(SOUND_DB_STORE))db.createObjectStore(SOUND_DB_STORE)};
+ req.onsuccess=()=>{const db=req.result;db.onversionchange=()=>{db.close();if(soundDB===db)soundDB=null};soundDB=db;resolve(db)};
+ req.onerror=()=>{if(req.error&&(req.error.name==='InvalidStateError'||req.error.name==='SecurityError'))soundDBUnavailable=true;reject(req.error||new Error('IndexedDB open failed'))};
+ req.onblocked=()=>reject(new Error('IndexedDB blocked'))})}
+
+function soundDBRun(mode,run){return openSoundDB().then(db=>new Promise((resolve,reject)=>{
+ let tx=null;try{tx=db.transaction(SOUND_DB_STORE,mode)}catch(e){return reject(e)}
+ let value;
+ try{const req=run(tx.objectStore(SOUND_DB_STORE));if(req)req.onsuccess=()=>{value=req.result}}catch(e){try{tx.abort()}catch(e2){}return reject(e)}
+ tx.oncomplete=()=>resolve(value);
+ tx.onabort=()=>reject(tx.error||new Error('IndexedDB transaction aborted'));
+ tx.onerror=()=>reject(tx.error||new Error('IndexedDB transaction failed'))}))}
+
+function putSoundFile(dbKey,file,at){return soundDBRun('readwrite',store=>store.put({name:file.name||'',type:file.type||'',blob:file,at:Number.isFinite(at)?at:Date.now()},dbKey))}
+function getSoundFile(dbKey){return soundDBRun('readonly',store=>store.get(dbKey))}
+function removeSoundFile(dbKey){return soundDBRun('readwrite',store=>store.delete(dbKey))}
+function isSoundFallbackSrc(src){return typeof src==='string'&&src.length<=SOUND_FALLBACK_MAX_LENGTH&&/^data:(?:audio\/|video\/|application\/(?:octet-stream|ogg|x-wav))[^,]*;base64,[A-Za-z0-9+/]*={0,2}$/.test(src)}
+function readSoundFallback(slot){const key=SOUND_FALLBACK_PREFIX+slot;let raw=null;try{raw=localStorage.getItem(key)}catch(e){return null}if(!raw)return null;try{const record=JSON.parse(raw);if(record&&record.version===1&&Number.isFinite(record.at)&&typeof record.name==='string'&&isSoundFallbackSrc(record.src))return{at:record.at,name:record.name.slice(0,1024),src:record.src}}catch(e){}try{localStorage.removeItem(key)}catch(e){}return null}
+function writeSoundFallback(slot,token,file,at){if(token!==soundTokens[slot])return Promise.resolve(false);if(!file||typeof file.size!=='number'||file.size>SOUND_FALLBACK_MAX_BYTES||typeof FileReader==='undefined')return Promise.reject(new Error('Sound fallback unsupported'));return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>{if(token!==soundTokens[slot]){resolve(false);return}const src=reader.result;if(!isSoundFallbackSrc(src)){reject(new Error('Invalid sound fallback'));return}try{localStorage.setItem(SOUND_FALLBACK_PREFIX+slot,JSON.stringify({version:1,at,name:typeof file.name==='string'?file.name.slice(0,1024):'',src}));resolve(true)}catch(e){reject(e)}};reader.onerror=()=>reject(reader.error||new Error('Sound fallback read failed'));reader.onabort=()=>reject(reader.error||new Error('Sound fallback read aborted'));try{reader.readAsDataURL(file)}catch(e){reject(e)}})}
+function removeSoundFallback(slot){try{localStorage.removeItem(SOUND_FALLBACK_PREFIX+slot)}catch(e){return Promise.reject(e)}return Promise.resolve()}
+function settleSoundTask(task){return task.then(value=>({ok:true,value}),error=>({ok:false,error}))}
+function persistSoundFile(slot,token,file){if(token!==soundTokens[slot])return Promise.resolve();const cfg=SOUND_SLOTS[slot],at=Date.now();return Promise.all([settleSoundTask(writeSoundFallback(slot,token,file,at)),settleSoundTask(putSoundFile(cfg.dbKey,file,at))]).then(results=>{if(!results[0].ok&&!results[1].ok)throw results[1].error||results[0].error||new Error('Sound persistence failed');if(results[1].ok)return removeSoundFallback(slot).then(()=>true,()=>true);return true})}
+function deletePersistedSound(slot){const dbKey=SOUND_SLOTS[slot].dbKey;return Promise.all([settleSoundTask(removeSoundFile(dbKey)),settleSoundTask(removeSoundFallback(slot))]).then(results=>{if(!results[0].ok||!results[1].ok)throw results[0].error||results[1].error||new Error('Sound deletion failed');return true})}
+
+function clearSoundSlot(slot){const cfg=SOUND_SLOTS[slot],prev=S[cfg.srcKey];if(typeof prev==='string'&&prev.indexOf('blob:')===0){try{URL.revokeObjectURL(prev)}catch(e){}}S[cfg.srcKey]=null;S[cfg.nameKey]=null;soundBuffers[slot]=null;soundBufferTokens[slot]=-1;renderSoundName(slot)}
+function invalidateSoundSlot(slot){soundTokens[slot]++;clearSoundSlot(slot)}
+function fillSoundSlot(slot,url,name){const cfg=SOUND_SLOTS[slot];S[cfg.srcKey]=url;S[cfg.nameKey]=name||null;soundBuffers[slot]=null;soundBufferTokens[slot]=-1;renderSoundName(slot);preloadSoundBuffer(slot,url,soundTokens[slot])}
+function clearSoundInput(slot){const input=document.getElementById(SOUND_SLOTS[slot].inputId);if(input)input.value=''}
+function queueSoundWrite(slot,task){soundWrites[slot]=soundWrites[slot].catch(()=>{}).then(task);return soundWrites[slot]}
+
+function applySoundFile(slot,file){
+ invalidateSoundSlot(slot);
+ const token=soundTokens[slot];
+ let url=null;try{url=URL.createObjectURL(file)}catch(e){}
+ if(!url){setSoundIssue(slot,SOUND_SAVE_ERROR);return}
+ if(token!==soundTokens[slot]){URL.revokeObjectURL(url);return}
+ fillSoundSlot(slot,url,file.name||'');
+ setSoundIssue(slot,'');
+ clearSoundInput(slot);
+ saveSettings();
+ queueSoundWrite(slot,()=>token===soundTokens[slot]?persistSoundFile(slot,token,file):null).then(()=>{if(token===soundTokens[slot])setSoundIssue(slot,'')},()=>{if(token===soundTokens[slot])setSoundIssue(slot,SOUND_SAVE_ERROR)})}
+
+function resetSoundSlot(slot){
+ invalidateSoundSlot(slot);
+ const token=soundTokens[slot];
+ clearSoundInput(slot);
+ setSoundIssue(slot,'');
+ saveSettings();
+ queueSoundWrite(slot,()=>deletePersistedSound(slot)).then(()=>{if(token===soundTokens[slot])setSoundIssue(slot,'')},()=>{if(token===soundTokens[slot])setSoundIssue(slot,SOUND_DELETE_ERROR)})}
+
+function restoreSavedSound(slot){
+ const cfg=SOUND_SLOTS[slot];
+ soundTokens[slot]++;
+ const token=soundTokens[slot];
+ const fallback=readSoundFallback(slot);
+ if(fallback)fillSoundSlot(slot,fallback.src,fallback.name);
+ return getSoundFile(cfg.dbKey).then(record=>{
+ if(token!==soundTokens[slot])return;
+ const blob=record?(record.blob||record.file||(typeof record.size==='number'?record:null)):null;
+ if(blob){let url=null;try{url=URL.createObjectURL(blob)}catch(e){}const at=record&&Number.isFinite(record.at)?record.at:0;if(url&&(!fallback||at>=fallback.at)){if(fallback)soundTokens[slot]++;clearSoundSlot(slot);fillSoundSlot(slot,url,record.name||(blob.name||''));setSoundIssue(slot,'');if(fallback)return removeSoundFallback(slot).then(()=>{},()=>{});return}if(url){try{URL.revokeObjectURL(url)}catch(e){}}else if(!fallback){clearSoundSlot(slot);setSoundIssue(slot,SOUND_LOAD_ERROR);return}}
+ if(fallback){setSoundIssue(slot,'');return}
+ clearSoundSlot(slot);
+ setSoundIssue(slot,'')},()=>{
+ if(token!==soundTokens[slot])return;
+ if(fallback){setSoundIssue(slot,'');return}
+ clearSoundSlot(slot);
+ setSoundIssue(slot,SOUND_LOAD_ERROR)})}
+
+function restoreSavedSounds(){
+ renderSoundName('first');
+ renderSoundName('normal');
+ renderSoundStatus();
+ return Promise.all([restoreSavedSound('first'),restoreSavedSound('normal')]).then(()=>{},()=>{})}
+
+document.getElementById('soundFirstFile').addEventListener('change',e=>{const file=e.target.files&&e.target.files[0];if(file)applySoundFile('first',file)});
+document.getElementById('soundNormalFile').addEventListener('change',e=>{const file=e.target.files&&e.target.files[0];if(file)applySoundFile('normal',file)});
+document.getElementById('resetFirst').addEventListener('click',()=>resetSoundSlot('first'));
+document.getElementById('resetNormal').addEventListener('click',()=>resetSoundSlot('normal'));
+
+function advanceBPM(){const old=S.currentBPM;if(S.pendingBPM!==null)return false;if(old>=S.targetBPM-0.05){S.currentBPM=S.targetBPM;S.progress=100;return false}const step=Math.round(S.targetBPM*S.stepPct/100*10)/10,denom=S.targetBPM-getStartBPM(),bpm=Math.min(Math.round((old+step)*10)/10,S.targetBPM),progress=bpm===S.targetBPM?100:Math.min(S.progress+(bpm-old)/denom*100,100);if(bpm>old){S.pendingBPM=bpm;S.pendingProgress=progress;return true}return false}
+
+function startMetronome(){if(S.isPlaying&&!S.isPaused)return;initAudio();if(S.isPaused){S.isPaused=false;S.beatIndex=0;S.measureIndex=0;S.repCounter=0;S.beatNumber=1;S.pendingBPM=null;S.pendingProgress=0;S.beatDisplayLeadIn=S.leadInActive;updateBeatIndicator();scheduleBeat();return}S.isPlaying=true;S.isPaused=false;S.currentBPM=getStartBPM();S.progress=0;S.pendingBPM=null;S.pendingProgress=0;S.repCounter=0;S.measureIndex=0;S.beatIndex=0;S.beatNumber=1;S.leadInActive=S.leadIn;S.beatDisplayLeadIn=false;updateProg();updateBeatIndicator();scheduleBeat()}
+
+function scheduleBeat(){if(!S.isPlaying||S.isPaused)return;const bpm=S.pendingBPM===null?S.currentBPM:S.pendingBPM;if(bpm<=0)return;const interval=getBeatInterval(bpm);const isDownbeat=S.beatIndex===0;S.timer=setTimeout(()=>{if(S.pendingBPM!==null){S.currentBPM=S.pendingBPM;S.progress=S.pendingProgress;S.pendingBPM=null;S.pendingProgress=0;updateProg()}S.beatNumber=S.beatIndex+1;S.beatDisplayLeadIn=S.leadInActive;updateBeatIndicator();playTick(isDownbeat,S.leadInActive?LEAD_IN_PITCH_RATIO:1);S.beatIndex++;if(S.leadInActive){if(S.beatIndex>=S.numerator){S.beatIndex=0;S.leadInActive=false}}else if(S.beatIndex>=S.numerator){S.beatIndex=0;S.measureIndex++;if(S.measureIndex>=getMeasuresPerLevel()){S.measureIndex=0;S.repCounter++;if(advanceBPM()&&S.leadIn){S.leadInActive=true}}}updateProg();scheduleBeat()},interval)}
+
+function pauseMetronome(){S.isPaused=true;clearTimeout(S.timer);stopActiveSounds();updateProg();updateBeatIndicator()}
+function stopMetronome(){S.isPlaying=false;S.isPaused=false;clearTimeout(S.timer);stopActiveSounds();S.currentBPM=getStartBPM();S.progress=0;S.pendingBPM=null;S.pendingProgress=0;S.repCounter=0;S.measureIndex=0;S.beatIndex=0;S.beatNumber=1;S.leadInActive=false;S.beatDisplayLeadIn=false;updateProg();updateBeatIndicator()}
+
+function updateProg(){document.getElementById('progressFill').style.width=S.progress+'%';document.getElementById('progressLabel').textContent=S.currentBPM.toFixed(1)+' BPM'}
+function updateBeatIndicator(){const el=document.getElementById('beatIndicator');el.hidden=!S.showBeat;el.textContent=String(S.beatNumber);el.classList.toggle('beat-one',S.beatNumber===1);el.classList.toggle('lead-in',S.beatDisplayLeadIn)}
+
+document.getElementById('btnPlay').addEventListener('click',startMetronome);
+document.getElementById('btnPause').addEventListener('click',pauseMetronome);
+document.getElementById('btnStop').addEventListener('click',stopMetronome);
+function updateVolumeFader(){const el=document.getElementById('volumeFader');const value=Math.round(S.volume*100);el.setAttribute('aria-valuenow',value);el.setAttribute('aria-valuetext',value+'%');el.querySelector('.volume-fill').style.transform='scaleY('+S.volume+')'}
+function setupVolumeFader(){const el=document.getElementById('volumeFader');let dragging=false;
+function setFromY(y){const r=el.getBoundingClientRect();setVolume((r.bottom-y)/r.height);updateVolumeFader()}
+function onMove(e){if(dragging)setFromY(e.clientY)}
+function onUp(){if(!dragging)return;dragging=false;el.classList.remove('dragging');document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);saveSettings()}
+el.addEventListener('mousedown',e=>{if(e.button!==0)return;e.preventDefault();dragging=true;el.classList.add('dragging');setFromY(e.clientY);document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp)});
+el.addEventListener('keydown',e=>{let value=S.volume;if(e.key==='ArrowUp'||e.key==='ArrowRight')value+=.05;else if(e.key==='ArrowDown'||e.key==='ArrowLeft')value-=.05;else if(e.key==='PageUp')value+=.1;else if(e.key==='PageDown')value-=.1;else if(e.key==='Home')value=0;else if(e.key==='End')value=1;else return;e.preventDefault();setVolume(value);updateVolumeFader();saveSettings()});
+updateVolumeFader()}
+document.getElementById('leadInCheck').addEventListener('change',e=>{S.leadIn=e.target.checked});
+document.getElementById('showBeatCheck').addEventListener('change',e=>{S.showBeat=e.target.checked;updateBeatIndicator();saveSettings()});
+
+function saveSettings(){try{localStorage.setItem('metronomeSettings',JSON.stringify({numerator:S.numerator,denominator:S.denominator,beatsCount:S.beatsCount,targetBPM:S.targetBPM,startPct:S.startPct,stepPct:S.stepPct,reps:S.reps,leadIn:S.leadIn,showBeat:S.showBeat,volume:S.volume}))}catch(e){}}
+
+function normalizeInt(value,min,max,fallback){if(value===null||value===''||typeof value==='boolean')return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,Math.round(n))):fallback}
+function loadSettings(){let d;S.beatDisplayLeadIn=false;try{d=JSON.parse(localStorage.getItem('metronomeSettings'))}catch{return}if(!d||typeof d!=='object')return;S.numerator=normalizeInt(d.numerator,1,24,4);S.denominator=[1,2,4,8,16].includes(Number(d.denominator))?Number(d.denominator):4;S.beatsCount=normalizeInt(d.beatsCount,1,24,4);S.targetBPM=normalizeInt(d.targetBPM,40,300,120);S.startPct=normalizeInt(d.startPct,1,99,70);S.stepPct=normalizeInt(d.stepPct,1,20,5);S.reps=normalizeInt(d.reps,1,20,3);S.leadIn=d.leadIn||false;S.showBeat=d.showBeat===true;S.volume=Number.isFinite(d.volume)?Math.max(0,Math.min(1,d.volume)):0.75;S.soundFirstSrc=null;S.soundNormalSrc=null;S.soundFirstName=null;S.soundNormalName=null;Object.keys(CELL_DEFS).forEach(name=>renderCell(document.getElementById(CELL_DEFS[name].id),CELL_DEFS[name]));document.getElementById('beatsCell').textContent=S.beatsCount;document.getElementById('leadInCheck').checked=S.leadIn;document.getElementById('showBeatCheck').checked=S.showBeat;updateBeatIndicator();saveSettings()}
+
+loadSettings();
+restoreSavedSounds();
+setupVolumeFader();
+Object.keys(CELL_DEFS).forEach(name=>setupCell(document.getElementById(CELL_DEFS[name].id),CELL_DEFS[name]));
+setupBeats();
+updateProg();
+updateBeatIndicator();
+</script>
+</body>
+</html>
